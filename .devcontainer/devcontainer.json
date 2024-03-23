@@ -4,5 +4,20 @@
         "dockerfile": "../Dockerfile",
         "context": "../"
     },
-    "initializeCommand": "ls"
+    "initializeCommand": "ls",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "streetsidesoftware.code-spell-checker",
+                "ms-azuretools.vscode-docker",
+                "mhutchie.git-graph",
+                "ms-python.vscode-pylance",
+                "ms-python.isort",
+                "ms-python.debugpy",
+                "redhat.vscode-yaml",
+                "jebbs.plantuml"
+            ]
+        }
+    }
 }
