@@ -1,5 +1,5 @@
 {
-    "name": "Pytorch-2.2.0-ROCm",
+    "name": "Pytorch-2.2.0-with-Lightning",
     "build": {
         "dockerfile": "../Dockerfile",
         "context": "../"

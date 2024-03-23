@@ -1,1 +1,1 @@
-lightning==2.2.0
+lightning[pytorch-extra]==2.2.0
