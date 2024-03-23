@@ -2,3 +2,7 @@ __pycache__
 save
 .idea
 training
+.ruff_cache
+*.swp
+*.pth
+*~

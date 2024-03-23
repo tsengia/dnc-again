@@ -14,35 +14,29 @@
 #
 # ==============================================================================
 
-import atexit
-
-ENABLED=False
-
-_profiler = None
+import torch
+import torch.nn.functional as F
 
 
-def construct():
-    global _profiler
-    if not ENABLED:
-        return
+class BitmapTask(torch.utils.data.Dataset):
+    def __init__(self):
+        super(BitmapTask, self).__init__()
+        pass
 
-    if _profiler is None:
-        from line_profiler import LineProfiler
-        _profiler = LineProfiler()
+    def set_dump_dir(self, dir):
+        self._img.set_dump_dir(dir)
 
+    def __len__(self):
+        return 0x7FFFFFFF
 
-def do_profile(follow=[]):
-    construct()
-    def inner(func):
-        if _profiler is not None:
-            _profiler.add_function(func)
-            for f in follow:
-                _profiler.add_function(f)
-            _profiler.enable_by_count()
-        return func
-    return inner
+    def visualize_preview(self, data, net_output):
+        pass
 
-@atexit.register
-def print_prof():
-    if _profiler is not None:
-        _profiler.print_stats()
+    def loss(self, net_output, target):
+        return F.binary_cross_entropy_with_logits(net_output, target, reduction="sum") / net_output.size(0)
+
+    def state_dict(self):
+        return {}
+
+    def load_state_dict(self, state):
+        pass

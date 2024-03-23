@@ -15,8 +15,7 @@
 # ==============================================================================
 
 import numpy as np
-from .BitmapTask import BitmapTask
-from Utils.Seed import get_randstate
+import BitmapTask
 
 class AssociativeRecall(BitmapTask):
     def __init__(self, length=None, bit_w=8, block_w=3, transform=lambda x: x):
@@ -28,8 +27,6 @@ class AssociativeRecall(BitmapTask):
         self.seed = None
 
     def __getitem__(self, key):
-        if self.seed is None:
-            self.seed = get_randstate()
 
         length = self.length() if callable(self.length) else self.length
         if length is None:

@@ -4,7 +4,7 @@ import torch.utils.data
 import torch.nn.init as init
 import math
 
-from Util import linear_reset
+from models.util import linear_reset
 
 class LSTMController(torch.nn.Module):
     def __init__(self, layer_sizes, out_from_all_layers: bool =True):

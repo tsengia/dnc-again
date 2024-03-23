@@ -16,26 +16,6 @@
 
 import numpy as np
 
-from Utils.Helpers import as_numpy
-
-def visualize_bitmap_task(i_data, o_data, zoom=8):
-    if not isinstance(o_data, list):
-        o_data = [o_data]
-        
-    imgs = []
-    for d in [i_data]+o_data:
-        if d is None:
-            continue
-        
-        d=as_numpy(d)
-        if d.ndim>2:
-            d=d[0]            
-        
-        imgs.append(np.expand_dims(d.T*255, -1).astype(np.uint8))
-        
-    img = np.concatenate(imgs, 0)
-    return nearest_zoom(img, zoom)
-
 def visualize_01(t, zoom=8):
     return nearest_zoom(np.expand_dims(t*255,-1).astype(np.uint8), zoom)
 

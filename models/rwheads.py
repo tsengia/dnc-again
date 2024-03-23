@@ -2,8 +2,8 @@ import torch
 import torch.utils.data
 import torch.nn.functional as F
 
-from AllocationManager import AllocationManager, ContentAddressGenerator
-from Util import split_tensor, oneplus
+from models.allocation_manager import AllocationManager, ContentAddressGenerator
+from models.util import split_tensor, oneplus
 
 class WriteHead(torch.nn.Module):
     @staticmethod

@@ -19,10 +19,10 @@ import torch.utils.data
 
 import lightning as L
 
-from Util import linear_reset, split_tensor
+from models.util import linear_reset, split_tensor
 
-from RWHeads import RawReadHead, RawWriteHead
-from TemporalMemory import TemporalMemoryLinkage, DistSharpnessEnhancer
+from models.rwheads import RawReadHead, RawWriteHead
+from models.temporal_memory import TemporalMemoryLinkage, DistSharpnessEnhancer
 
 class DNC(torch.nn.Module):
     def __init__(self, input_size: int, output_size: int, word_length: int, cell_count: int, n_read_heads: int, controller, batch_first: bool=False, clip_controller=20,
@@ -130,19 +130,29 @@ class DNC(torch.nn.Module):
 
         return torch.stack(out_tsteps, dim=1 if self.batch_first else 0)
 
-class DNCLightning(L.LightningModule):
-    def __init__(self, vocab_size):
-        super().__init__()
-        self.model = DNC()
 
-    def forward(self, inputs, target):
-        return self.model(inputs)
+class LitDNC(L.LightningModule):
+    def __init__(self, optimizer_type: str, learning_rate: float, weight_decay: float, momentum: float, eps: float = 1e-10):
+        super().__init__()
+        self.optimizer_type = optimizer_type
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.momentum = momentum
+        self.eps = eps
+        self.model = DNC()
+        # TODO: Setup the model
+        pass
 
     def training_step(self, batch, batch_idx):
-        inputs, target = batch
-        output = self(inputs, target)
-        loss = torch.nn.functional.nll_loss(output, target.view(-1))
-        return loss
+        pass
 
     def configure_optimizers(self):
-        return torch.optim.SGD(self.model.parameters(), lr=0.1)
+        
+        if self.optimizer_type == "sgd":
+            return torch.optim.SGD(self.params, self.learning_rate, self.weight_decay, self.momentum)
+        elif self.optimizer_type == "adam":
+            return torch.optim.Adam(self.params, self.learning_rate, self.weight_decay)
+        elif self.optimizer_type == "rmsprop":
+            return torch.optim.RMSprop(self.params, self.learning_rate, self.weight_decay, self.momentum, self.eps)
+        else:
+            assert "Invalid optimizer: %s" % self.optimizer_type

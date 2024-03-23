@@ -18,7 +18,7 @@ import time
 import threading
 import traceback
 import sys
-from Utils import universal as U
+from utils import universal as U
 
 
 def preview(vis_interval=None, to_numpy=True, debatch=False):
