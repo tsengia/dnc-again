@@ -105,7 +105,7 @@ class AllocationManager(torch.nn.Module):
         # Free gates shape: [batch, n_heads]
 
         self._init_consts(prev_read_distributions.device)
-        phi = torch.addcmul(self.one, -1, free_gates.unsqueeze(-1), prev_read_distributions).prod(-2)
+        phi = torch.addcmul(self.one, free_gates.unsqueeze(-1), prev_read_distributions, value=-1).prod(-2)
         # Phi is the free tensor, sized [batch, cell count]
 
         # If memory usage counter if doesn't exists
@@ -113,7 +113,7 @@ class AllocationManager(torch.nn.Module):
             self._init_sequence(prev_read_distributions)
             # in first timestep nothing is written or read yet, so we don't need any further processing
         else:
-            self.usages = torch.addcmul(self.usages, 1, prev_write_distribution.detach(), (1 - self.usages)) * phi
+            self.usages = torch.addcmul(self.usages, prev_write_distribution.detach(), (1 - self.usages), value=1) * phi
 
         return phi
 

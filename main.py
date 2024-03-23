@@ -20,6 +20,7 @@ import functools
 import os
 
 import torch.utils.data
+from torch.utils.tensorboard import SummaryWriter
 
 import Utils.Debug as debug
 from Dataset.Bitmap.AssociativeRecall import AssociativeRecall
@@ -29,7 +30,7 @@ from Dataset.Bitmap.CopyTask import CopyData
 from Dataset.Bitmap.KeyValue2Way import KeyValue2Way
 from Dataset.NLP.bAbi import bAbiDataset
 from Models.DNC import DNC, LSTMController, FeedforwardController
-from Utils import Visdom
+
 from Utils.ArgumentParser import ArgumentParser
 from Utils.Index import index_by_dim
 from Utils.Saver import Saver, GlobalVarSaver, StateSaver
@@ -52,6 +53,7 @@ def main():
     global i
     global loss_sum
     global running
+    global writer
     parser = ArgumentParser()
     parser.add_argument("-bit_w", type=int, default=8, help="Bit vector length for copy task")
     parser.add_argument("-block_w", type=int, default=3, help="Block width to associative recall task")
@@ -119,7 +121,7 @@ def main():
             "test_interval": 5000,
             "think_steps": 3,
             "batch_size": 2
-        }, include=["dnc-msd"]),
+        }),
 
         ArgumentParser.Profile("repeat_copy", {
             "bit_w": 8,
@@ -232,17 +234,11 @@ def main():
     if opt.demo:
         Seed.fix()
 
-    os.makedirs(os.path.join(opt.name,"save"), exist_ok=True)
-    os.makedirs(os.path.join(opt.name,"preview"), exist_ok=True)
+    summary = SummaryWriter()
 
-    gpu_allocator.use_gpu(opt.gpu)
+    # gpu_allocator.use_gpu(opt.gpu)
 
     debug.enableDebug = opt.debug_log
-
-    if opt.visport>0:
-        Visdom.start(opt.visport)
-
-    Visdom.Text("Name").set(opt.name)
 
     class LengthHackSampler:
         def __init__(self, batch_size, length):
@@ -315,7 +311,7 @@ def main():
         {'params': [p for n, p in model.named_parameters() if n.endswith(".bias")], 'weight_decay': 0}
     ]
 
-    device = torch.device('cuda') if opt.gpu!="none" else torch.device("cpu")
+    device = torch.device("cpu")
     print("DEVICE: ", device)
 
     if isinstance(dataset, NLPTask):
@@ -341,13 +337,11 @@ def main():
     i=0
     loss_sum = 0
 
-    loss_plot = Visdom.Plot2D("loss", store_interval=opt.info_interval, xlabel="iterations", ylabel="loss")
-
-    if curriculum is not None:
-        curriculum_plot = Visdom.Plot2D("curriculum lesson" +
-                                    (" (last %d)" % (curriculum.n_lessons-1) if curriculum.n_lessons is not None else ""),
-                                    xlabel="iterations", ylabel="lesson")
-        curriculum_accuracy = Visdom.Plot2D("curriculum accuracy", xlabel="iterations", ylabel="accuracy")
+    # if curriculum is not None:
+    #     curriculum_plot = Visdom.Plot2D("curriculum lesson" +
+    #                                 (" (last %d)" % (curriculum.n_lessons-1) if curriculum.n_lessons is not None else ""),
+    #                                 xlabel="iterations", ylabel="lesson")
+    #     curriculum_accuracy = Visdom.Plot2D("curriculum accuracy", xlabel="iterations", ylabel="accuracy")
 
     saver = Saver(os.path.join(opt.name, "save"), short_interval=opt.save_interval)
     saver.register("model", StateSaver(model))
@@ -359,10 +353,10 @@ def main():
     if test_set:
         saver.register("test_set", StateSaver(test_set))
 
-    if curriculum is not None:
-        saver.register("curriculum", StateSaver(curriculum))
-        saver.register("curriculum_plot", StateSaver(curriculum_plot))
-        saver.register("curriculum_accuracy", StateSaver(curriculum_accuracy))
+    # if curriculum is not None:
+    #     saver.register("curriculum", StateSaver(curriculum))
+    #     saver.register("curriculum_plot", StateSaver(curriculum_plot))
+    #     saver.register("curriculum_accuracy", StateSaver(curriculum_accuracy))
 
     if isinstance(dataset, NLPTask):
         saver.register("word_embeddings", StateSaver(embedding))
@@ -388,44 +382,44 @@ def main():
         }
     }
 
-    def plot_debug(debug, prefix="", schema={}):
-        if debug is None:
-            return
+    # def plot_debug(debug, prefix="", schema={}):
+    #     if debug is None:
+    #         return
 
-        for k, v in debug.items():
-            curr_name = prefix+k
-            if curr_name in debug_schemas:
-                curr_schema = schema.copy()
-                curr_schema.update(debug_schemas[curr_name])
-            else:
-                curr_schema = schema
+    #     for k, v in debug.items():
+    #         curr_name = prefix+k
+    #         if curr_name in debug_schemas:
+    #             curr_schema = schema.copy()
+    #             curr_schema.update(debug_schemas[curr_name])
+    #         else:
+    #             curr_schema = schema
 
-            if isinstance(v, dict):
-                plot_debug(v, curr_name+"/", curr_schema)
-                continue
+    #         if isinstance(v, dict):
+    #             plot_debug(v, curr_name+"/", curr_schema)
+    #             continue
 
-            data = v[0]
+    #         data = v[0]
 
-            if curr_schema.get("list_dim",-1) > 0:
-                if data.ndim != 3:
-                    print("WARNING: unknown data shape for array display: %s, tensor %s" % (data.shape, curr_name))
-                    continue
+    #         if curr_schema.get("list_dim",-1) > 0:
+    #             if data.ndim != 3:
+    #                 print("WARNING: unknown data shape for array display: %s, tensor %s" % (data.shape, curr_name))
+    #                 continue
 
-                n_steps = data.shape[curr_schema["list_dim"]-1]
-                if curr_name not in visualizers:
-                    visualizers[curr_name] = [Visdom.Heatmap(curr_name+"_%d" % i, dumpdir=os.path.join(opt.name, "preview") if opt.dump_heatmaps else None) for i in range(n_steps)]
+    #             n_steps = data.shape[curr_schema["list_dim"]-1]
+    #             if curr_name not in visualizers:
+    #                 visualizers[curr_name] = [Visdom.Heatmap(curr_name+"_%d" % i, dumpdir=os.path.join(opt.name, "preview") if opt.dump_heatmaps else None) for i in range(n_steps)]
 
-                for i in range(n_steps):
-                    visualizers[curr_name][i].draw(index_by_dim(data, curr_schema["list_dim"]-1, i))
-            else:
-                if data.ndim != 2:
-                    print("WARNING: unknown data shape for simple display: %s, tensor %s" % (data.shape, curr_name))
-                    continue
+    #             for i in range(n_steps):
+    #                 visualizers[curr_name][i].draw(index_by_dim(data, curr_schema["list_dim"]-1, i))
+    #         else:
+    #             if data.ndim != 2:
+    #                 print("WARNING: unknown data shape for simple display: %s, tensor %s" % (data.shape, curr_name))
+    #                 continue
 
-                if curr_name not in visualizers:
-                    visualizers[curr_name] = Visdom.Heatmap(curr_name, dumpdir=os.path.join(opt.name, "preview") if opt.dump_heatmaps else None)
+    #             if curr_name not in visualizers:
+    #                 visualizers[curr_name] = Visdom.Heatmap(curr_name, dumpdir=os.path.join(opt.name, "preview") if opt.dump_heatmaps else None)
 
-                visualizers[curr_name].draw(data)
+    #             visualizers[curr_name].draw(data)
 
 
     def run_model(input, debug=None):
@@ -510,8 +504,8 @@ def main():
             output = embedding.backmap_output(output, pos_map, raw_data["output"].shape[1])
         dataset.visualize_preview(raw_data, output)
 
-        if debug is not None:
-            plot_debug(debug)
+        # if debug is not None:
+        #     plot_debug(debug)
 
     preview_timer=OnceEvery(opt.preview_interval)
 
@@ -611,7 +605,7 @@ def main():
             i += 1
 
             curr_loss = l.data.item()
-            loss_plot.add_point(i, curr_loss)
+            summary.add_scalar("Loss/train", curr_loss, i)
 
             loss_sum += curr_loss
 
@@ -621,15 +615,14 @@ def main():
                 loss_avg = loss_sum / opt.info_interval
 
                 if curriculum is not None:
-                    curriculum_accuracy.add_point(i, curriculum.get_accuracy())
-                    curriculum_plot.add_point(i, curriculum.step)
+                    summary.add_scalar("curriculum accuracy", curriculum.get_accuracy(), i)
+                    summary.add_scalar("curriculum step", curriculum.step, i)
 
                 message = "Iteration %d, loss: %.4f" % (i, loss_avg)
                 if iter_start_time is not None:
-                    message += " (%.2f ms/iter, load time %.2g ms/iter, visport: %s)" % (
+                    message += " (%.2f ms/iter, load time %.2g ms/iter)" % (
                                 (tim - iter_start_time) / opt.info_interval * 1000.0,
-                                data_load_total_time / opt.info_interval * 1000.0,
-                                Visdom.port)
+                                data_load_total_time / opt.info_interval * 1000.0)
                 print(message)
                 iter_start_time = tim
                 loss_sum = 0
@@ -656,16 +649,5 @@ def main():
 
 
 if __name__ == "__main__":
-    global running
-    running = True
-
-
-    def signal_handler(signal, frame):
-        global running
-        print('You pressed Ctrl+C!')
-        running = False
-
-
-    signal.signal(signal.SIGINT, signal_handler)
 
     main()

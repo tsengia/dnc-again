@@ -1,0 +1,8 @@
+{
+    "name": "Pytorch-2.2.0-ROCm",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": "../"
+    },
+    "initializeCommand": "ls"
+}

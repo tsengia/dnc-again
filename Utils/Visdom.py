@@ -23,7 +23,7 @@ import socket
 from . import Process
 
 vis = None
-port = None
+port = 7000
 visdom_fail_count = 0
 
 
@@ -60,20 +60,7 @@ def start(on_port=None):
     global vis
     global port
     global visdom_fail_count
-    assert vis is None, "Cannot start more than 1 visdom servers."
-
-    if visdom_fail_count>=3:
-        return
-
-    port = alloc_port() if on_port is None else on_port
-
-    print("Starting Visdom server on %d" % port)
-    Process.run("%s -m visdom.server -p %d" % (sys.executable, port))
-    if not wait_for_port(port):
-        print("ERROR: failed to start Visdom server. Server not responding.")
-        visdom_fail_count += 1
-        return
-    print("Done.")
+    
 
     vis = visdom.Visdom(port=port)
 

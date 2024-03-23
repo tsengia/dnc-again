@@ -108,7 +108,7 @@ class ArgumentParser:
 
         profile = {}
         if self.raw.profile:
-            assert not loaded, "Loading arguments from file, but profile given."
+            #assert not loaded, "Loading arguments from file, but profile given."
             for pr in self.raw.profile.split(","):
                 p = self.profiles.get(pr)
                 assert p is not None, "Invalid profile: %s. Valid profiles: %s" % (pr, self.profiles.keys())
