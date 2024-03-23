@@ -1,7 +1,6 @@
 from typing import List
 import torch
 import torch.utils.data
-import torch.nn.functional as F
 import torch.nn.init as init
 import math
 
@@ -20,17 +19,17 @@ class LSTMController(torch.nn.Module):
         self.outputs = [None] * len(self.layer_sizes)
 
     def reset_parameters(self):
-        def init_layer(l, index):
+        def init_layer(layer, index):
             size = self.layer_sizes[index]
             # Initialize all matrices to sigmoid, just data input to tanh
             a=math.sqrt(3.0)*self.stdevs[i]
-            l.weight.data[0:-size].uniform_(-a,a)
+            layer.weight.data[0:-size].uniform_(-a,a)
             a*=init.calculate_gain("tanh")
-            l.weight.data[-size:].uniform_(-a, a)
-            if l.bias is not None:
-                l.bias.data[self.layer_sizes[i]:].fill_(0)
+            layer.weight.data[-size:].uniform_(-a, a)
+            if layer.bias is not None:
+                layer.bias.data[self.layer_sizes[i]:].fill_(0)
                 # init forget gate to large number.
-                l.bias.data[:self.layer_sizes[i]].fill_(1)
+                layer.bias.data[:self.layer_sizes[i]].fill_(1)
 
         # xavier init merged input weights
         for i in range(len(self.layer_sizes)):

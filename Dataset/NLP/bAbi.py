@@ -89,14 +89,12 @@ class bAbiDataset(NLPTask):
     def _seq_to_nn_input(self, seq):
         in_arr = []
         out_arr = []
-        hasAnswer = False
         for sentence in seq[0]:
             in_arr += sentence.sentence
             out_arr += [0] * len(sentence.sentence)
             if sentence.answer is not None:
                 in_arr += [0] * (len(sentence.answer) + self._think_steps)
                 out_arr += [0] * self._think_steps + sentence.answer
-                hasAnswer = True
 
         in_arr = np.asarray(in_arr, np.int64)
         out_arr = np.asarray(out_arr, np.int64)
@@ -132,7 +130,9 @@ class bAbiDataset(NLPTask):
         if not os.path.isdir(os.path.join(self.cache_dir, self.DIR_NAME)):
             print(self.URL)
             print("bAbi data not found. Downloading...")
-            import requests, tarfile, io
+            import requests
+            import tarfile
+            import io
             request = requests.get(self.URL, headers={"User-agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.80 Safari/537.36"})
             
             decompressed_file = tarfile.open(fileobj=io.BytesIO(request.content), mode='r|gz')

@@ -4,9 +4,7 @@ import torch.utils.data
 import torch.nn.functional as F
 import torch.nn.init as init
 import functools
-import math
 
-import lightning as L
 
 def oneplus(t):
     return F.softplus(t, 1, 20) + 1.0
@@ -32,11 +30,11 @@ def dict_get(dict,name):
 
 def dict_append(dict, name, val):
     if dict is not None:
-        l = dict.get(name)
-        if not l:
-            l = []
-            dict[name] = l
-        l.append(val)
+        array = dict.get(name)
+        if not array:
+            array = []
+            dict[name] = array
+        array.append(val)
 
 
 def init_debug(debug, initial):
@@ -55,6 +53,5 @@ def merge_debug_tensors(d, dim):
 def linear_reset(module, gain=1.0):
     assert isinstance(module, torch.nn.Linear)
     init.xavier_uniform_(module.weight, gain=gain)
-    s = module.weight.size(1)
     if module.bias is not None:
         module.bias.data.zero_()

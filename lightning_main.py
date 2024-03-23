@@ -33,19 +33,8 @@ from Dataset.NLP.bAbi import bAbiDataset
 from Models.DNC import DNC, LSTMController, FeedforwardController
 
 from Utils.ArgumentParser import ArgumentParser
-from Utils.Index import index_by_dim
-from Utils.Saver import Saver, GlobalVarSaver, StateSaver
-from Utils.Collate import MetaCollate
-from Utils import gpu_allocator
 from Dataset.NLP.NLPTask import NLPTask
-from tqdm import tqdm
-from Visualize.preview import preview
-from Utils.timer import OnceEvery
 from Utils import Seed
-import time
-import sys
-import signal
-import math
 from Utils import Profile
 
 Profile.ENABLED=False
@@ -253,8 +242,6 @@ def main():
 
     embedding = None
     test_set = None
-    curriculum = None
-    loader_reset = False
     if opt.task=="copy":
         dataset = CopyData(bit_w=opt.bit_w)
         in_size = opt.bit_w + 1
@@ -285,12 +272,12 @@ def main():
     else:
         assert False, "Invalid task: %s" % opt.task
 
-    if opt.task in ["babi"]:
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=opt.batch_size, num_workers=4, pin_memory=True, shuffle=True, collate_fn=MetaCollate())
-        test_loader = torch.utils.data.DataLoader(test_set, batch_size=opt.test_batch_size, num_workers=opt.test_batch_size, pin_memory=True, shuffle=False, collate_fn=MetaCollate()) if test_set is not None else None
-    else:
-        dataset = BitmapTaskRepeater(dataset)
-        data_loader = torch.utils.data.DataLoader(dataset, batch_sampler=LengthHackSampler(opt.batch_size, BitmapTaskRepeater.key_sampler(opt.len, opt.repeat)), num_workers=1, pin_memory=True)
+    #if opt.task in ["babi"]:
+        # data_loader = torch.utils.data.DataLoader(dataset, batch_size=opt.batch_size, num_workers=4, pin_memory=True, shuffle=True, collate_fn=MetaCollate())
+        # test_loader = torch.utils.data.DataLoader(test_set, batch_size=opt.test_batch_size, num_workers=opt.test_batch_size, pin_memory=True, shuffle=False, collate_fn=MetaCollate()) if test_set is not None else None
+    #else:
+    dataset = BitmapTaskRepeater(dataset)
+        # data_loader = torch.utils.data.DataLoader(dataset, batch_sampler=LengthHackSampler(opt.batch_size, BitmapTaskRepeater.key_sampler(opt.len, opt.repeat)), num_workers=1, pin_memory=True)
 
     if opt.controller_type == "lstm":
         controller_constructor = functools.partial(LSTMController, out_from_all_layers=opt.lstm_use_all_outputs)
@@ -325,6 +312,7 @@ def main():
     else:
         assert "Invalid optimizer: %s" % opt.optimizer
 
+    print(optimizer)
     n_params = sum([sum([t.numel() for t in d['params']]) for d in params])
     print("Number of parameters: %d" % n_params)
 

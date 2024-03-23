@@ -1,10 +1,10 @@
 from typing import List
 import torch
 import torch.utils.data
+from Util import split_tensor, oneplus
 
 _EPS = 1e-6
 
-from Util import split_tensor, oneplus
 
 class TemporalMemoryLinkage(torch.nn.Module):
     def __init__(self):
@@ -77,7 +77,6 @@ class DistSharpnessEnhancer(torch.nn.Module):
 
         res = []
         for i, d in enumerate(dists):
-            s = list(d.size())
             ndim = d.dim()
             f  = factors[i]
             if ndim==2:

@@ -33,10 +33,7 @@ from Dataset.NLP.bAbi import bAbiDataset
 from Models.DNC import DNC, LSTMController, FeedforwardController
 
 from Utils.ArgumentParser import ArgumentParser
-from Utils.Index import index_by_dim
-from Utils.Saver import Saver, GlobalVarSaver, StateSaver
 from Utils.Collate import MetaCollate
-from Utils import gpu_allocator
 from Dataset.NLP.NLPTask import NLPTask
 from tqdm import tqdm
 from Visualize.preview import preview
@@ -44,7 +41,6 @@ from Utils.timer import OnceEvery
 from Utils import Seed
 import time
 import sys
-import signal
 import math
 from Utils import Profile
 
@@ -341,84 +337,10 @@ def main():
     #                                 xlabel="iterations", ylabel="lesson")
     #     curriculum_accuracy = Visdom.Plot2D("curriculum accuracy", xlabel="iterations", ylabel="accuracy")
 
-    saver = Saver(os.path.join(opt.name, "save"), short_interval=opt.save_interval)
-    saver.register("model", StateSaver(model))
-    saver.register("optimizer", StateSaver(optimizer))
-    saver.register("i", GlobalVarSaver("i"))
-    saver.register("loss_sum", GlobalVarSaver("loss_sum"))
-    saver.register("loss_plot", StateSaver(loss_plot))
-    saver.register("dataset", StateSaver(dataset))
-    if test_set:
-        saver.register("test_set", StateSaver(test_set))
-
     # if curriculum is not None:
     #     saver.register("curriculum", StateSaver(curriculum))
     #     saver.register("curriculum_plot", StateSaver(curriculum_plot))
     #     saver.register("curriculum_accuracy", StateSaver(curriculum_accuracy))
-
-    if isinstance(dataset, NLPTask):
-        saver.register("word_embeddings", StateSaver(embedding))
-    elif embedding is not None:
-        saver.register("embeddings", StateSaver(embedding))
-
-    if not saver.load(opt.load):
-        model.reset_parameters()
-        if embedding is not None:
-            embedding.reset_parameters()
-
-    visualizers = {}
-
-    debug_schemas={
-        "read_head" : {
-            "list_dim" : 2
-        },
-        "temporal_links/forward_dists" : {
-            "list_dim" : 2
-        },
-        "temporal_links/backward_dists" : {
-            "list_dim" : 2
-        }
-    }
-
-    # def plot_debug(debug, prefix="", schema={}):
-    #     if debug is None:
-    #         return
-
-    #     for k, v in debug.items():
-    #         curr_name = prefix+k
-    #         if curr_name in debug_schemas:
-    #             curr_schema = schema.copy()
-    #             curr_schema.update(debug_schemas[curr_name])
-    #         else:
-    #             curr_schema = schema
-
-    #         if isinstance(v, dict):
-    #             plot_debug(v, curr_name+"/", curr_schema)
-    #             continue
-
-    #         data = v[0]
-
-    #         if curr_schema.get("list_dim",-1) > 0:
-    #             if data.ndim != 3:
-    #                 print("WARNING: unknown data shape for array display: %s, tensor %s" % (data.shape, curr_name))
-    #                 continue
-
-    #             n_steps = data.shape[curr_schema["list_dim"]-1]
-    #             if curr_name not in visualizers:
-    #                 visualizers[curr_name] = [Visdom.Heatmap(curr_name+"_%d" % i, dumpdir=os.path.join(opt.name, "preview") if opt.dump_heatmaps else None) for i in range(n_steps)]
-
-    #             for i in range(n_steps):
-    #                 visualizers[curr_name][i].draw(index_by_dim(data, curr_schema["list_dim"]-1, i))
-    #         else:
-    #             if data.ndim != 2:
-    #                 print("WARNING: unknown data shape for simple display: %s, tensor %s" % (data.shape, curr_name))
-    #                 continue
-
-    #             if curr_name not in visualizers:
-    #                 visualizers[curr_name] = Visdom.Heatmap(curr_name, dumpdir=os.path.join(opt.name, "preview") if opt.dump_heatmaps else None)
-
-    #             visualizers[curr_name].draw(data)
-
 
     def run_model(input, debug=None):
         if isinstance(dataset, NLPTask):
@@ -457,9 +379,6 @@ def main():
 
     if opt.test_on_start.lower() in ["on", "1", "true", "quit"]:
         test()
-        if opt.test_on_start.lower() == "quit":
-            saver.write(i)
-            sys.exit(-1)
 
     if opt.print_test:
         model.eval()
@@ -579,9 +498,8 @@ def main():
                 f2 = data.copy()
                 f2["input"] = input
                 output = run_model(f2, debug=debug_data if subbatch==n_subbatch-1 else None)
-                l = dataset.loss(output, target)
-                debug.nan_check(l, force=True)
-                l.backward()
+                loss = dataset.loss(output, target)
+                loss.backward()
 
                 if curriculum is not None:
                     curriculum.update(*dataset.curriculum_measure(output, target))
@@ -602,7 +520,7 @@ def main():
 
             i += 1
 
-            curr_loss = l.data.item()
+            curr_loss = loss.data.item()
 
             loss_sum += curr_loss
 
@@ -610,10 +528,6 @@ def main():
             if i % opt.info_interval == 0:
                 tim = time.time()
                 loss_avg = loss_sum / opt.info_interval
-
-                if curriculum is not None:
-                    summary.add_scalar("curriculum accuracy", curriculum.get_accuracy(), i)
-                    summary.add_scalar("curriculum step", curriculum.step, i)
 
                 message = "Iteration %d, loss: %.4f" % (i, loss_avg)
                 if iter_start_time is not None:
@@ -632,8 +546,6 @@ def main():
 
             if i % opt.test_interval==0:
                 test()
-
-            saver.tick(i)
 
             if opt.demo and opt.exit_after is None:
                 running = False

@@ -78,12 +78,6 @@ def shape(t):
     return list(t.shape)
 
 
-def transpose(t, axis):
-    if torch.is_tensor(t):
-        return t.permute(axis)
-    else:
-        return np.transpose(t, axis)
-
 
 def apply_recursive(d, fn, filter=None):
     if isinstance(d, list):
@@ -152,8 +146,7 @@ def flip(t, axis):
         return t.flip(axis)
     else:
         return np.flip(t, axis)
-
-
+    
 def transpose(t, axes):
     if torch.is_tensor(t):
         return t.permute(*axes)

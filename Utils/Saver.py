@@ -202,7 +202,7 @@ class Saver:
                 try:
                     print("Loading %s" % fname)
                     data = torch.load(os.path.join(dir, fname))
-                except:
+                except torch.ErrorReport:
                     print("WARNING: Loading %s failed. Maybe file is corrupted?" % fname)
                     continue
                 return data
