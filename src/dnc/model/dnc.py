@@ -14,6 +14,7 @@
 #
 # ==============================================================================
 
+from typing import Literal
 import torch
 import torch.utils.data
 
@@ -23,19 +24,41 @@ from models.util import linear_reset, split_tensor
 
 from models.rwheads import RawReadHead, RawWriteHead
 from models.temporal_memory import TemporalMemoryLinkage, DistSharpnessEnhancer
+from models.controllers import LSTMController, FeedforwardController
 
 class DNC(torch.nn.Module):
-    def __init__(self, input_size: int, output_size: int, word_length: int, cell_count: int, n_read_heads: int, controller, batch_first: bool=False, clip_controller=20,
-                 bias: bool=True, mask: bool=False, dealloc_content: bool=True, link_sharpness_control: bool=True, disable_content_norm: bool=False,
-                 mask_min: float=0.0, disable_key_masking: bool=False):
+    def __init__(self, 
+                 input_size: int, 
+                 output_size: int, 
+                 word_length: int, 
+                 cell_count: int, 
+                 n_read_heads: int, 
+                 controller: LSTMController | FeedforwardController, 
+                 batch_first: bool=False, 
+                 clip_controller: int =20,
+                 bias: bool=True, 
+                 mask: bool=False, 
+                 dealloc_content: bool=True, 
+                 link_sharpness_control: bool=True, 
+                 disable_content_norm: bool=False,
+                 mask_min: float=0.0, 
+                 disable_key_masking: bool=False):
         super(DNC, self).__init__()
 
         self.clip_controller = clip_controller
 
-        self.read_head = RawReadHead(n_read_heads, word_length, use_mask=mask, disable_content_norm=disable_content_norm,
-                                     mask_min=mask_min, disable_key_masking=disable_key_masking)
-        self.write_head = RawWriteHead(n_read_heads, word_length, use_mask=mask, dealloc_content=dealloc_content,
-                                       disable_content_norm=disable_content_norm, mask_min=mask_min,
+        self.read_head = RawReadHead(n_read_heads, 
+                                     word_length, 
+                                     use_mask=mask, 
+                                     disable_content_norm=disable_content_norm,
+                                     mask_min=mask_min, 
+                                     disable_key_masking=disable_key_masking)
+        self.write_head = RawWriteHead(n_read_heads, 
+                                       word_length, 
+                                       use_mask=mask, 
+                                       dealloc_content=dealloc_content,
+                                       disable_content_norm=disable_content_norm, 
+                                       mask_min=mask_min,
                                        disable_key_masking=disable_key_masking)
         self.temporal_link = TemporalMemoryLinkage()
         self.sharpness_control = DistSharpnessEnhancer([n_read_heads, n_read_heads]) if link_sharpness_control else None
@@ -103,9 +126,9 @@ class DNC(torch.nn.Module):
         # output:
         return self.controller_to_out(control_data) + self.read_to_out(read_data.view(batch_size,-1))
 
-    def _mem_init(self, batch_size, device):
+    def _mem_init(self, batch_size):
         if self.zero_mem_tensor is None or self.zero_mem_tensor.size(0)!=batch_size:
-            self.zero_mem_tensor = torch.zeros(batch_size, self.cell_count, self.word_length).to(device)
+            self.zero_mem_tensor = torch.zeros(batch_size, self.cell_count, self.word_length)
 
         self.memory = self.zero_mem_tensor
 
@@ -115,7 +138,7 @@ class DNC(torch.nn.Module):
         self.temporal_link.new_sequence()
         self.controller.new_sequence()
 
-        self._mem_init(in_data.size(0 if self.batch_first else 1), in_data.device)
+        self._mem_init(in_data.size(0 if self.batch_first else 1))
 
         out_tsteps = []
 
@@ -132,14 +155,53 @@ class DNC(torch.nn.Module):
 
 
 class LitDNC(L.LightningModule):
-    def __init__(self, optimizer_type: str, learning_rate: float, weight_decay: float, momentum: float, eps: float = 1e-10):
+    
+    def __init__(self, 
+                 optimizer_type: Literal["sgd", "adam", "rmsprop"] = "rmsprop", 
+                 learning_rate: float = 0.0001, 
+                 weight_decay: float = 1e-5, 
+                 momentum: float = 0.9, 
+                 eps: float = 1e-10,
+                 input_size: int = 8,
+                 output_size: int = 8,
+                 word_length: int = 8,
+                 cell_count: int = 8,
+                 n_read_heads: int = 2,
+                 batch_first: bool = False,
+                 enable_bias: bool = True,
+                 controller: LSTMController | FeedforwardController = LSTMController,
+                 mask: bool=False, 
+                 dealloc_content: bool=True, 
+                 link_sharpness_control: bool=True, 
+                 disable_content_norm: bool=False,
+                 mask_min: float=0.0, 
+                 disable_key_masking: bool=False,
+                 clip_controller: int = 20
+                 ):
         super().__init__()
         self.optimizer_type = optimizer_type
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.momentum = momentum
         self.eps = eps
-        self.model = DNC()
+        self.model = DNC(
+            input_size, 
+            output_size, 
+            word_length, 
+            cell_count,
+            n_read_heads, 
+            controller, 
+            batch_first, 
+            clip_controller,
+            enable_bias, 
+            mask, 
+            dealloc_content, 
+            link_sharpness_control, 
+            disable_content_norm,
+            mask_min, 
+            disable_key_masking
+        )
+        
         # TODO: Setup the model
         pass
 
@@ -149,10 +211,19 @@ class LitDNC(L.LightningModule):
     def configure_optimizers(self):
         
         if self.optimizer_type == "sgd":
-            return torch.optim.SGD(self.params, self.learning_rate, self.weight_decay, self.momentum)
+            return torch.optim.SGD(self.model.parameters, 
+                                   self.learning_rate, 
+                                   weight_decay=self.weight_decay, 
+                                   momentum=self.momentum)
         elif self.optimizer_type == "adam":
-            return torch.optim.Adam(self.params, self.learning_rate, self.weight_decay)
+            return torch.optim.Adam(self.model.parameters, 
+                                    self.learning_rate, 
+                                    weight_decay=self.weight_decay)
         elif self.optimizer_type == "rmsprop":
-            return torch.optim.RMSprop(self.params, self.learning_rate, self.weight_decay, self.momentum, self.eps)
+            return torch.optim.RMSprop(self.model.parameters, 
+                                       self.learning_rate, 
+                                       weight_decay=self.weight_decay, 
+                                       momentum=self.momentum, 
+                                       eps=self.eps)
         else:
-            assert "Invalid optimizer: %s" % self.optimizer_type
+            raise Exception(f"Invalid optimizer: {self.optimizer_type}")

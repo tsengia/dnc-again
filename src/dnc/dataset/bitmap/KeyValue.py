@@ -16,8 +16,8 @@
 
 import math
 import numpy as np
+from torch import randint
 from .BitmapTask import BitmapTask
-from Utils.Seed import get_randstate
 
 
 class KeyValue(BitmapTask):
@@ -27,13 +27,10 @@ class KeyValue(BitmapTask):
         self.length = length
         self.bit_w = bit_w
         self.transform = transform
-        self.seed = None
         self.key_w = self.bit_w//2
         self.max_key = 2**self.key_w - 1
 
     def __getitem__(self, key):
-        if self.seed is None:
-            self.seed = get_randstate()
 
         if self.length is None:
             # Random length batch hack.
@@ -45,7 +42,7 @@ class KeyValue(BitmapTask):
         keys = None
         last_size = 0
         while last_size!=length:
-            res = self.seed.random_integers(0, self.max_key, size=(length - last_size))
+            res = randint(0, self.max_key, size=(length - last_size))
             if keys is not None:
                 keys = np.concatenate((res, keys))
             else:
@@ -61,9 +58,9 @@ class KeyValue(BitmapTask):
         keys = np.flip(keys, axis=-1).reshape(keys.shape[0],-1)[:, :self.key_w]
         keys = keys.astype(np.float32)
 
-        values = self.seed.randint(0,2, keys.shape).astype(np.float32)
-
-        perm = self.seed.permutation(length)
+        values = float(randint(0,2, keys.shape))
+        
+        perm = permutation(length)
         keys_perm = keys[perm,:]
         values_perm = values[perm,:]
 

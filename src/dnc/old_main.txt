@@ -1,4 +1,4 @@
-
+// spell-checker: disable
 def main():
     global i
     global loss_sum

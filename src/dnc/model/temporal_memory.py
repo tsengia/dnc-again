@@ -26,8 +26,8 @@ class TemporalMemoryLinkage(torch.nn.Module):
     def _init_link(self, w_dist):
         s = list(w_dist.size())
         if self.initial_shape is None or s != self.initial_shape:
-            self.initial_temp_link_mat = torch.zeros(s[0], s[-1], s[-1]).to(w_dist.device)
-            self.initial_precedence_weighting = torch.zeros(s[0], s[-1]).to(w_dist.device)
+            self.initial_temp_link_mat = torch.zeros(s[0], s[-1], s[-1])
+            self.initial_precedence_weighting = torch.zeros(s[0], s[-1])
             self.initial_diag_mask = (1.0 - torch.eye(s[-1]).unsqueeze(0).to(w_dist)).detach()
 
         self.temp_link_mat = self.initial_temp_link_mat

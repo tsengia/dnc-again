@@ -23,9 +23,6 @@ class BitmapTask(torch.utils.data.Dataset):
         super(BitmapTask, self).__init__()
         pass
 
-    def set_dump_dir(self, dir):
-        self._img.set_dump_dir(dir)
-
     def __len__(self):
         return 0x7FFFFFFF
 

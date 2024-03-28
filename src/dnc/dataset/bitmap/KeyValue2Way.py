@@ -16,9 +16,7 @@
 
 import math
 import numpy as np
-from .BitmapTask import BitmapTask
-from Utils.Seed import get_randstate
-
+from bitmap.BitmapTask import BitmapTask
 
 class KeyValue2Way(BitmapTask):
     def __init__(self, length=None, bit_w=8, transform=lambda x: x):
@@ -32,8 +30,6 @@ class KeyValue2Way(BitmapTask):
         self.max_key = 2**self.key_w - 1
 
     def __getitem__(self, key):
-        if self.seed is None:
-            self.seed = get_randstate()
 
         if self.length is None:
             # Random length batch hack.
